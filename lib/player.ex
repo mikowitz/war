@@ -12,6 +12,10 @@ defmodule Player do
     GenServer.call(player, :name)
   end
 
+  def join(player, game) do
+    GenStateMachine.cast(game, {:player_joined, player})
+  end
+
   def init(name) do
     {:ok, %__MODULE__{name: name}}
   end
