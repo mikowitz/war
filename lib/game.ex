@@ -60,7 +60,7 @@ defmodule Game do
 
   @doc false
   @spec handle_event(term, term, term, term) :: term
-  def handle_event(_, _, _, _)
+  def handle_event(event_type, event, current_state, current_data)
 
   def handle_event(:internal, :enter, :waiting_for_players, state) do
     IO.puts "players needed: #{2 - length(state.players)}"
@@ -288,5 +288,4 @@ defmodule Game do
     |> List.flatten
     r1 == r2
   end
-
 end
