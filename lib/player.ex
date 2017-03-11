@@ -20,8 +20,16 @@ defmodule Player do
     GenServer.cast(player, :request_card)
   end
 
+  def request_war(player) do
+    GenServer.cast(player, :request_war)
+  end
+
   def give_card(player, game) do
     Game.play_card(game, player)
+  end
+
+  def give_cards_for_war(player, game) do
+    Game.play_war(game, player)
   end
 
   def init(name) do
@@ -34,6 +42,11 @@ defmodule Player do
 
   def handle_cast(:request_card, state) do
     IO.puts "#{state.name}: we need a card from you."
+    {:noreply, state}
+  end
+
+  def handle_cast(:request_war, state) do
+    IO.puts "#{state.name}: we need 4 cards from you for a war!"
     {:noreply, state}
   end
 end
