@@ -9,7 +9,7 @@ defmodule Game do
 
   defmodule PlayerState do
     @moduledoc """
-    Models the persistent state for a player in a game of War"
+    Models the persistent state for a player in a game of War
     """
     defstruct hand: [], played_cards: [],
       winner: false,
@@ -25,28 +25,40 @@ defmodule Game do
       winner: nil
   end
 
+  @doc """
+  Start a new game, either providing a pre-shuffled deck or allowing
+  the function to generate its own.
+  """
   @spec new(Deck.t | nil) :: pid
   def new(deck \\ Deck.new) do
     {:ok, game} = GenStateMachine.start_link(__MODULE__, deck)
     game
   end
 
+  @doc """
+  Public API for a player flipping over a single card
+  """
   @spec play_card(pid, pid) :: :ok
   def play_card(game, player) do
     GenStateMachine.cast(game, {:play_card, player})
   end
 
+  @doc """
+  Public API for a player flipping over cards for a war
+  """
   @spec play_war(pid, pid) :: :ok
   def play_war(game, player) do
     GenStateMachine.cast(game, {:play_war, player})
   end
 
+  @doc false
   @spec init(Deck.t) :: :ok
   def init(deck) do
     IO.puts "Starting a new game"
     {:ok, :waiting_for_players, %Game.State{deck: deck}, @enter_state}
   end
 
+  @doc false
   @spec handle_event(term, term, term, term) :: term
   def handle_event(_, _, _, _)
 
