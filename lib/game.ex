@@ -1,35 +1,52 @@
 defmodule Game do
+  @moduledoc """
+  Models a game of War using `GenStateMachine`
+  """
   use GenStateMachine
 
   defmodule PlayerState do
+    @moduledoc """
+    Models the persistent state for a player in a game of War"
+    """
     defstruct hand: [], played_cards: [],
       winner: false,
       times_played: 0
   end
 
   defmodule State do
+    @moduledoc """
+    Models the persistent state for a game of War
+    """
     defstruct deck: nil, players: [],
       turn: 1, player_states: %{},
       winner: nil
   end
 
+  @spec new(Deck.t | nil) :: pid
   def new(deck \\ Deck.new) do
     {:ok, game} = GenStateMachine.start_link(__MODULE__, deck)
     game
   end
 
+  @spec play_card(pid, pid) :: :ok
+  def play_card(game, player) do
+    GenStateMachine.cast(game, {:play_card, player})
+  end
+
+  @spec play_war(pid, pid) :: :ok
+  def play_war(game, player) do
+    GenStateMachine.cast(game, {:play_war, player})
+  end
+
+  @spec init(Deck.t) :: :ok
   def init(deck) do
     IO.puts "Starting a new game"
     {:ok, :waiting_for_players, %Game.State{deck: deck}, [{:next_event, :internal, :enter}]}
   end
 
-  def play_card(game, player) do
-    GenStateMachine.cast(game, {:play_card, player})
-  end
 
-  def play_war(game, player) do
-    GenStateMachine.cast(game, {:play_war, player})
-  end
+  @spec handle_event(term, term, term, term) :: term
+  def handle_event(_, _, _, _)
 
   def handle_event(:internal, :enter, :waiting_for_players, state) do
     IO.puts "players needed: #{2 - length(state.players)}"
@@ -130,7 +147,7 @@ defmodule Game do
   def handle_event(:internal, :enter, :check_for_game_end, state) do
     case Enum.find(state.player_states, fn {_, %{hand: hand}} -> length(hand) == length(state.deck) end) do
       {player, _} ->
-        {:next_state, :game_over, %{state | winner: player }, [{:next_event, :internal, :enter}]}
+        {:next_state, :game_over, %{state | winner: player}, [{:next_event, :internal, :enter}]}
       x ->
         {:next_state, :turn, %{state | turn: state.turn + 1}, [{:next_event, :internal, :enter}]}
     end
