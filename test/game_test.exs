@@ -14,5 +14,18 @@ defmodule GameTest do
     :timer.sleep(50)
     Player.join(jeffrey, game)
     :timer.sleep(50)
+
+
+    :timer.sleep(100)
+
+    Player.give_card(michael, game)
+    :timer.sleep(50)
+    Player.give_card(lauren, game)
+    :timer.sleep(50)
+
+    Player.give_card(michael, game)
+    :timer.sleep(50)
+    Player.give_card(lauren, game)
+    :timer.sleep(50)
   end
 end

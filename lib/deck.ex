@@ -18,6 +18,18 @@ defmodule Deck do
     deal_card(deck, hands)
   end
 
+  def rank_value({r, _}) do
+    Enum.find_index(@ranks, &(&1 == r))
+  end
+
+  def suit_value({_, s}) do
+    Enum.find_index(@suits, &(&1 == s))
+  end
+
+  def value(card) do
+    {rank_value(card), suit_value(card)}
+  end
+
   defp deal_card([], hands), do: hands
   defp deal_card([card|cards], [hand|hands]) do
     deal_card(cards, hands ++ [[card|hand]])
