@@ -30,7 +30,8 @@ defmodule War.Mixfile do
   defp deps do
     [
       {:gen_state_machine, "~> 2.0"},
-      {:credo, "~> 0.6.1"}
+      {:credo, "~> 0.6.1"},
+      {:ex_doc, "~> 0.15.0"}
     ]
   end
 end
