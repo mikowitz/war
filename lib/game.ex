@@ -79,11 +79,6 @@ defmodule Game do
     :keep_state_and_data
   end
 
-  def is_tie(played_cards) do
-    [{r1, _}, {r2, _}] = Enum.map(played_cards, fn cards -> List.first(cards) end) |> List.flatten
-    r1 == r2
-  end
-
   def handle_event(:internal, :enter, :judge_turn, state) do
     IO.puts "Let's see what's going on here..."
     Enum.each(state.player_states, fn {player, %{played_cards: played_cards}} ->
@@ -186,62 +181,33 @@ defmodule Game do
     end
   end
 
+  defp update_state_for_war(player, new_played_cards, new_hand, state) do
+    player_state = state.player_states[player]
+    new_player_state = %{player_state | hand: new_hand,
+     played_cards: new_played_cards ++ player_state.played_cards,
+     times_played: player_state.times_played + 1}
+
+    new_player_states = Map.put(state.player_states, player, new_player_state)
+    new_state = %{state | player_states: new_player_states}
+    case Enum.map(new_state.player_states, fn {_, %{times_played: times_played}} -> times_played end) |> Enum.uniq |> length do
+      1 ->
+        {:next_state, :judge_turn, new_state, [{:next_event, :internal, :enter}]}
+      _ ->
+        {:keep_state, new_state}
+    end
+  end
+
   defp handle_play_cards_for_war(player, state) do
-    #case Map.get(state.hands, player) do
     player_state = state.player_states[player]
     case player_state.hand do
       [a,b,c,d|hand] ->
-        new_player_state = %{player_state | hand: hand,
-         played_cards: [d,c,b,a|player_state.played_cards],
-         times_played: player_state.times_played + 1}
-
-        new_player_states = Map.put(state.player_states, player, new_player_state)
-        new_state = %{state | player_states: new_player_states}
-        case Enum.map(new_state.player_states, fn {_, %{times_played: times_played}} -> times_played end) |> Enum.uniq |> length do
-          1 ->
-            {:next_state, :judge_turn, new_state, [{:next_event, :internal, :enter}]}
-          _ ->
-            {:keep_state, new_state}
-        end
+        update_state_for_war(player, [d,c,b,a], hand, state)
       [a,b,c] ->
-        new_player_state = %{player_state | hand: [],
-         played_cards: [c,b,a|player_state.played_cards],
-         times_played: player_state.times_played + 1}
-
-        new_player_states = Map.put(state.player_states, player, new_player_state)
-        new_state = %{state | player_states: new_player_states}
-        case Enum.map(new_state.player_states, fn {_, %{times_played: times_played}} -> times_played end) |> Enum.uniq |> length do
-          1 ->
-            {:next_state, :judge_turn, new_state, [{:next_event, :internal, :enter}]}
-          _ ->
-            {:keep_state, new_state}
-        end
+        update_state_for_war(player, [c,b,a], [], state)
       [a, b] ->
-        new_player_state = %{player_state | hand: [],
-         played_cards: [b,a|player_state.played_cards],
-         times_played: player_state.times_played + 1}
-
-        new_player_states = Map.put(state.player_states, player, new_player_state)
-        new_state = %{state | player_states: new_player_states}
-        case Enum.map(new_state.player_states, fn {_, %{times_played: times_played}} -> times_played end) |> Enum.uniq |> length do
-          1 ->
-            {:next_state, :judge_turn, new_state, [{:next_event, :internal, :enter}]}
-          _ ->
-            {:keep_state, new_state}
-        end
+        update_state_for_war(player, [b,a], [], state)
       [a] ->
-        new_player_state = %{player_state | hand: [],
-         played_cards: [a|player_state.played_cards],
-         times_played: player_state.times_played + 1}
-
-        new_player_states = Map.put(state.player_states, player, new_player_state)
-        new_state = %{state | player_states: new_player_states}
-        case Enum.map(new_state.player_states, fn {_, %{times_played: times_played}} -> times_played end) |> Enum.uniq |> length do
-          1 ->
-            {:next_state, :judge_turn, new_state, [{:next_event, :internal, :enter}]}
-          _ ->
-            {:keep_state, new_state}
-        end
+        update_state_for_war(player, [a], [], state)
       [] ->
         IO.puts "#{Player.name(player)} can't play any cards."
         winner = Enum.find(state.players, &(&1 != player))
@@ -250,4 +216,10 @@ defmodule Game do
         :keep_state_and_data
     end
   end
+
+  defp is_tie(played_cards) do
+    [{r1, _}, {r2, _}] = Enum.map(played_cards, fn cards -> List.first(cards) end) |> List.flatten
+    r1 == r2
+  end
+
 end
