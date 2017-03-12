@@ -6,6 +6,7 @@ defmodule Game do
   @enter_state [{:next_event, :internal, :enter}]
 
   use GenStateMachine
+  require Logger
 
   defmodule PlayerState do
     @moduledoc """
@@ -22,7 +23,7 @@ defmodule Game do
     """
     defstruct deck: nil, players: [],
       turn: 1, player_states: %{},
-      winner: nil
+      winner: nil, identifier: nil
   end
 
   @doc """
@@ -32,8 +33,9 @@ defmodule Game do
   @spec new(Deck.t | nil) :: pid
   def new(deck \\ Deck.new) do
     game_name = :"game-#{:os.system_time(:millisecond)}"
-    {:ok, _} = GenStateMachine.start_link(__MODULE__, deck, name: game_name)
-    {game_name, Node.self()}
+    identifier = {game_name, Node.self()}
+    {:ok, _} = GenStateMachine.start_link(__MODULE__, [deck, identifier], name: game_name)
+    identifier
   end
 
   @doc """
@@ -53,10 +55,11 @@ defmodule Game do
   end
 
   @doc false
-  @spec init(Deck.t) :: :ok
-  def init(deck) do
-    IO.puts "Starting a new game"
-    {:ok, :waiting_for_players, %Game.State{deck: deck}, @enter_state}
+  @spec init(list(term)) :: :ok
+  def init([deck, identifier]) do
+    Logger.info "Starting a new game"
+    state = %Game.State{deck: deck, identifier: identifier}
+    {:ok, :waiting_for_players, state, @enter_state}
   end
 
   @doc false
@@ -64,14 +67,14 @@ defmodule Game do
   def handle_event(event_type, event, current_state, current_data)
 
   def handle_event(:internal, :enter, :waiting_for_players, state) do
-    IO.puts "players needed: #{2 - length(state.players)}"
+    Logger.info "players needed: #{2 - length(state.players)}"
     :keep_state_and_data
   end
 
   def handle_event(:cast, {:player_joined, player}, :waiting_for_players, state) do
     case length(state.players) do
       1 ->
-        IO.puts "#{Player.name(player)} has joined the game"
+        Logger.info "#{Player.name(player)} has joined the game"
         new_players = [player|state.players] |> Enum.reverse
         player_states = new_players |> Enum.map(fn player ->
           {player, %PlayerState{}}
@@ -82,7 +85,7 @@ defmodule Game do
         message_players(state, "#{Player.name(player)} has joined the game")
         {:next_state, :ready, new_state, @enter_state}
       0 ->
-        IO.puts "#{Player.name(player)} has joined the game"
+        Logger.info "#{Player.name(player)} has joined the game"
         {:keep_state, %{state | players: [player]}, @enter_state}
       _ ->
         {:stop, "Shouldn't have gotten here"}
@@ -90,7 +93,7 @@ defmodule Game do
   end
 
   def handle_event(:internal, :enter, :ready, state) do
-    IO.puts "Ready to go with #{state.players |> player_names |> Enum.join(", ")}"
+    Logger.info "Ready to go with #{state.players |> player_names |> Enum.join(", ")}"
     message_players(
       state,
       "Ready to go with #{state.players |> player_names |> Enum.join(", ")}"
@@ -100,10 +103,10 @@ defmodule Game do
   end
 
   def handle_event(:internal, :enter, :turn, state) do
-    IO.puts "Turn: #{state.turn}"
-    IO.puts "Current hand count:"
+    Logger.info "Turn: #{state.turn}"
+    Logger.info "Current hand count:"
     Enum.each(state.player_states, fn {player, %{hand: hand}} ->
-      IO.puts "  #{Player.name(player)} -> #{length(hand)}"
+      Logger.info "  #{Player.name(player)} -> #{length(hand)}"
       message_player(player, "you've got #{length(hand)} cards in your hand")
     end)
     message_players(state, "flip over one card")
@@ -111,20 +114,20 @@ defmodule Game do
   end
 
   def handle_event(:cast, {:play_card, player}, :turn, state) do
-    IO.puts "#{Player.name(player)} is playing a card..."
+    Logger.info "#{Player.name(player)} is playing a card..."
     handle_play_card(player, state)
   end
 
   def handle_event(_, {:player_joined, player}, _, _state) do
-    IO.puts "Sorry, #{Player.name(player)}! This game is full!"
+    send player, "Sorry, #{Player.name(player)}! This game is full!"
     :keep_state_and_data
   end
 
   def handle_event(:internal, :enter, :judge_turn, state) do
-    IO.puts "Let's see what's going on here..."
+    Logger.info "Let's see what's going on here..."
     Enum.each(state.player_states, fn {player, %{played_cards: played_cards}} ->
       card = List.first(played_cards)
-      IO.puts "#{Player.name(player)} played #{inspect card}"
+      Logger.info "#{Player.name(player)} played #{inspect card}"
       message_players(state, "#{Player.name(player)} played #{inspect card}")
     end)
     all_played_cards = Enum.map(
@@ -135,7 +138,7 @@ defmodule Game do
     )
     case is_tie(all_played_cards) do
       true ->
-        IO.puts "WAR TIME!"
+        Logger.info "WAR TIME!"
         {:next_state, :war, state, @enter_state}
       false ->
         resolve_turn(state)
@@ -151,7 +154,7 @@ defmodule Game do
   end
 
   def handle_event(:cast, {:play_war, player}, :war, state) do
-    IO.puts "#{Player.name(player)} is playing cards for war..."
+    Logger.info "#{Player.name(player)} is playing cards for war..."
     handle_play_cards_for_war(player, state)
   end
 
@@ -165,12 +168,12 @@ defmodule Game do
   end
 
   def handle_event(:internal, :enter, :game_over, state) do
-    IO.puts "#{Player.name(state.winner)} won the game!"
+    Logger.info "#{Player.name(state.winner)} won the game!"
     {:stop, :normal}
   end
 
   def handle_event(_, event, current_state, _) do
-    IO.puts "received #{inspect event} in #{inspect current_state}"
+    Logger.info "received #{inspect event} in #{inspect current_state}"
     {:keep_state_and_data, [:postpone]}
   end
 
@@ -250,7 +253,7 @@ defmodule Game do
       [a,b,c,d|hand] ->
         update_state_for_war(player, [d,c,b,a], hand, state)
       [] ->
-        IO.puts "#{Player.name(player)} can't play any cards."
+        Logger.info "#{Player.name(player)} can't play any cards."
         winner = Enum.find(state.players, &(&1 != player))
         {:next_state, :game_over, %{state | winner: winner}, @enter_state}
       remaining_cards when is_list(remaining_cards) ->
@@ -277,7 +280,7 @@ defmodule Game do
 
   defp resolve_turn(state) do
     winner = determine_winner(state)
-    IO.puts "#{Player.name(winner)} wins!"
+    Logger.info "#{Player.name(winner)} wins!"
 
     won_cards = state.player_states
     |> Enum.map(fn {_, %{played_cards: cards}} -> cards end)
