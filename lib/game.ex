@@ -34,7 +34,9 @@ defmodule Game do
   def new(deck \\ Deck.new) do
     game_name = :"game-#{:os.system_time(:millisecond)}"
     identifier = {game_name, Node.self()}
-    {:ok, _} = GenStateMachine.start_link(__MODULE__, [deck, identifier], name: game_name)
+    {:ok, _} = GenStateMachine.start_link(
+      __MODULE__, [deck, identifier], name: game_name
+    )
     identifier
   end
 
