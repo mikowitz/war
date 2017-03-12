@@ -32,7 +32,7 @@ defmodule Game do
   @spec new(Deck.t | nil) :: pid
   def new(deck \\ Deck.new) do
     game_name = :"game-#{:os.system_time(:millisecond)}"
-    {:ok, game} = GenStateMachine.start_link(__MODULE__, deck, name: game_name)
+    {:ok, _} = GenStateMachine.start_link(__MODULE__, deck, name: game_name)
     {game_name, Node.self()}
   end
 
@@ -79,6 +79,7 @@ defmodule Game do
         new_state = %{state |
           players: new_players, player_states: player_states
         }
+        message_players(state, "#{Player.name(player)} has joined the game")
         {:next_state, :ready, new_state, @enter_state}
       0 ->
         IO.puts "#{Player.name(player)} has joined the game"
@@ -90,10 +91,10 @@ defmodule Game do
 
   def handle_event(:internal, :enter, :ready, state) do
     IO.puts "Ready to go with #{state.players |> player_names |> Enum.join(", ")}"
-    state.players
-    |> Enum.each(fn player ->
-      send player, "Ready to go with #{state.players |> player_names |> Enum.join(", ")}"
-    end)
+    message_players(
+      state,
+      "Ready to go with #{state.players |> player_names |> Enum.join(", ")}"
+    )
     new_state = deal_cards(state)
     {:next_state, :turn, new_state, @enter_state}
   end
@@ -103,10 +104,9 @@ defmodule Game do
     IO.puts "Current hand count:"
     Enum.each(state.player_states, fn {player, %{hand: hand}} ->
       IO.puts "  #{Player.name(player)} -> #{length(hand)}"
+      message_player(player, "you've got #{length(hand)} cards in your hand")
     end)
-    Enum.each(state.players, fn player ->
-      Player.request_card(player)
-    end)
+    message_players(state, "flip over one card")
     :keep_state_and_data
   end
 
@@ -115,7 +115,7 @@ defmodule Game do
     handle_play_card(player, state)
   end
 
-  def handle_event(_, {:player_joined, player}, _, state) do
+  def handle_event(_, {:player_joined, player}, _, _state) do
     IO.puts "Sorry, #{Player.name(player)}! This game is full!"
     :keep_state_and_data
   end
@@ -125,6 +125,7 @@ defmodule Game do
     Enum.each(state.player_states, fn {player, %{played_cards: played_cards}} ->
       card = List.first(played_cards)
       IO.puts "#{Player.name(player)} played #{inspect card}"
+      message_players(state, "#{Player.name(player)} played #{inspect card}")
     end)
     all_played_cards = Enum.map(
       state.player_states,
@@ -141,39 +142,11 @@ defmodule Game do
     end
   end
 
-  defp determine_winner(state) do
-    {winner, _} = state.player_states
-    |> Enum.max_by(fn {_, %{played_cards: [card|_]}} ->
-      Deck.value(card)
-    end)
-    winner
-  end
-
-  defp resolve_turn(state) do
-    winner = determine_winner(state)
-    IO.puts "#{Player.name(winner)} wins!"
-
-    won_cards = state.player_states
-    |> Enum.map(fn {_, %{played_cards: cards}} -> cards end)
-    |> List.flatten |> Enum.shuffle
-
-    new_player_states = state.player_states
-    |> Enum.map(fn {player, player_state} ->
-      new_state = %{player_state | played_cards: []}
-      new_state = case player == winner do
-        true -> %{new_state | hand: new_state.hand ++ won_cards}
-        false -> new_state
-      end
-      {player, new_state}
-    end) |> Enum.into(Map.new)
-    new_state = %{state | player_states: new_player_states}
-    {:next_state, :check_for_game_end, new_state, @enter_state}
-  end
-
   def handle_event(:internal, :enter, :war, state) do
-    Enum.each(state.players, fn player ->
-      Player.request_war(player)
-    end)
+    message_players(
+      state,
+      "THIS MEANS WAR! play 3 cards and flip over a fourth"
+    )
     :keep_state_and_data
   end
 
@@ -186,7 +159,7 @@ defmodule Game do
     case possible_winner(state) do
       {player, _} ->
         {:next_state, :game_over, %{state | winner: player}, @enter_state}
-      x ->
+      _ ->
         {:next_state, :turn, %{state | turn: state.turn + 1}, @enter_state}
     end
   end
@@ -292,5 +265,45 @@ defmodule Game do
     |> Enum.map(fn cards -> List.first(cards) end)
     |> List.flatten
     r1 == r2
+  end
+
+  defp determine_winner(state) do
+    {winner, _} = state.player_states
+    |> Enum.max_by(fn {_, %{played_cards: [card|_]}} ->
+      Deck.value(card)
+    end)
+    winner
+  end
+
+  defp resolve_turn(state) do
+    winner = determine_winner(state)
+    IO.puts "#{Player.name(winner)} wins!"
+
+    won_cards = state.player_states
+    |> Enum.map(fn {_, %{played_cards: cards}} -> cards end)
+    |> List.flatten |> Enum.shuffle
+
+    new_player_states = state.player_states
+    |> Enum.map(fn {player, player_state} ->
+      new_state = %{player_state | played_cards: []}
+      new_state = case player == winner do
+        true -> %{new_state | hand: new_state.hand ++ won_cards}
+        false -> new_state
+      end
+      {player, new_state}
+    end) |> Enum.into(Map.new)
+    new_state = %{state | player_states: new_player_states}
+    {:next_state, :check_for_game_end, new_state, @enter_state}
+  end
+
+  defp message_players(state, msg) do
+    state.players
+    |> Enum.each(fn player ->
+      message_player(player, msg)
+    end)
+  end
+
+  defp message_player(player, msg) do
+    send player, msg
   end
 end

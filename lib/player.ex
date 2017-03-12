@@ -9,9 +9,7 @@ defmodule Player do
   @spec new(String.t) :: pid
   def new(name) do
     process_name = :"player-#{name}-#{:os.system_time(:millisecond)}"
-    {:ok, player} = GenServer.start_link(__MODULE__, name, name: process_name)
-    #IO.inspect Node.self()
-    #player
+    {:ok, _} = GenServer.start_link(__MODULE__, name, name: process_name)
     {process_name, Node.self()}
   end
 
@@ -29,22 +27,6 @@ defmodule Player do
   @spec join(pid, pid) :: :ok
   def join(player, game) do
     GenStateMachine.cast(game, {:player_joined, player})
-  end
-
-  @doc """
-  Public API for requesting a single card from `player`
-  """
-  @spec request_card(pid) :: :ok
-  def request_card(player) do
-    GenServer.cast(player, :request_card)
-  end
-
-  @doc """
-  Public API for requesting cards for a war from `player`
-  """
-  @spec request_war(pid) :: :ok
-  def request_war(player) do
-    GenServer.cast(player, :request_war)
   end
 
   @doc """
@@ -77,22 +59,8 @@ defmodule Player do
     {:reply, state.name, state}
   end
 
-  @doc false
-  @spec handle_cast(atom, Map.t) :: :ok
-  def handle_cast(_, _)
-
-  def handle_cast(:request_card, state) do
-    IO.puts "#{state.name}: we need a card from you."
-    {:noreply, state}
-  end
-
-  def handle_cast(:request_war, state) do
-    IO.puts "#{state.name}: we need 4 cards from you for a war!"
-    {:noreply, state}
-  end
-
   def handle_info(msg, state) do
-    IO.puts msg
+    IO.puts "#{state.name}: #{msg}"
     {:noreply, state}
   end
 end
