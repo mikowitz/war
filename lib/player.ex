@@ -8,8 +8,11 @@ defmodule Player do
 
   @spec new(String.t) :: pid
   def new(name) do
-    {:ok, player} = GenServer.start_link(__MODULE__, name)
-    player
+    process_name = :"player-#{name}-#{:os.system_time(:millisecond)}"
+    {:ok, player} = GenServer.start_link(__MODULE__, name, name: process_name)
+    #IO.inspect Node.self()
+    #player
+    {process_name, Node.self()}
   end
 
   @doc """
@@ -85,6 +88,11 @@ defmodule Player do
 
   def handle_cast(:request_war, state) do
     IO.puts "#{state.name}: we need 4 cards from you for a war!"
+    {:noreply, state}
+  end
+
+  def handle_info(msg, state) do
+    IO.puts msg
     {:noreply, state}
   end
 end

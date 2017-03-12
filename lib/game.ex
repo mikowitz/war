@@ -31,8 +31,9 @@ defmodule Game do
   """
   @spec new(Deck.t | nil) :: pid
   def new(deck \\ Deck.new) do
-    {:ok, game} = GenStateMachine.start_link(__MODULE__, deck)
-    game
+    game_name = :"game-#{:os.system_time(:millisecond)}"
+    {:ok, game} = GenStateMachine.start_link(__MODULE__, deck, name: game_name)
+    {game_name, Node.self()}
   end
 
   @doc """
@@ -89,6 +90,10 @@ defmodule Game do
 
   def handle_event(:internal, :enter, :ready, state) do
     IO.puts "Ready to go with #{state.players |> player_names |> Enum.join(", ")}"
+    state.players
+    |> Enum.each(fn player ->
+      send player, "Ready to go with #{state.players |> player_names |> Enum.join(", ")}"
+    end)
     new_state = deal_cards(state)
     {:next_state, :turn, new_state, @enter_state}
   end
