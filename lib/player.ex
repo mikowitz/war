@@ -55,12 +55,14 @@ defmodule Player do
   @spec handle_call(atom, term, Map.t) :: :ok
   def handle_call(_, _, _)
 
-  def handle_call(:name, _from, state) do
-    {:reply, state.name, state}
+  def handle_call(:name, _from, player) do
+    {:reply, player.name, player}
   end
 
-  def handle_info(msg, state) do
-    IO.puts "#{state.name}: #{msg}"
-    {:noreply, state}
+  @doc false
+  @spec handle_info(term, Map.t) :: :ok
+  def handle_info(msg, player) do
+    IO.puts "#{player.name}: #{msg}"
+    {:noreply, player}
   end
 end
