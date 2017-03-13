@@ -1,6 +1,7 @@
 defmodule GameTest do
   use ExUnit.Case, async: false
 
+  @tag :distributed
   test "running the game for a quick win" do
     IO.puts "QUICK WIN >>"
     test_deck = [{"2", "S"}, {"3", "H"}, {"5", "C"}, {"A", "S"}]
@@ -31,6 +32,7 @@ defmodule GameTest do
     IO.puts "<< QUICK WIN"
   end
 
+  @tag :distributed
   test "running the game with a war" do
     IO.puts "ONE WAR >>"
     test_deck = [
@@ -134,6 +136,7 @@ defmodule GameTest do
     IO.puts "<< RUNNING A GAME WITH TWO WARS"
   end
 
+  @tag :distributed
   test "running the game with a one-card war" do
     IO.puts "RUNNING A GAME WITH TWO WARS >>"
     test_deck = [

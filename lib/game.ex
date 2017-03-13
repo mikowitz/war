@@ -266,10 +266,7 @@ defmodule Game do
   end
 
   defp is_tie(played_cards) do
-    [{r1, _}, {r2, _}] = played_cards
-    |> Enum.map(fn cards -> List.first(cards) end)
-    |> List.flatten
-    r1 == r2
+    apply(&Deck.is_tie/2, Enum.map(played_cards, &List.first/1))
   end
 
   defp determine_winner(state) do
@@ -302,13 +299,17 @@ defmodule Game do
   end
 
   defp message_players(state, msg) do
-    state.players
-    |> Enum.each(fn player ->
-      message_player(player, msg)
-    end)
+    if Mix.env != :test do
+      state.players
+      |> Enum.each(fn player ->
+        message_player(player, msg)
+      end)
+    end
   end
 
   defp message_player(player, msg) do
-    send player, msg
+    if Mix.env != :test do
+      send player, msg
+    end
   end
 end

@@ -46,6 +46,10 @@ defmodule Deck do
     {rank_value(card), suit_value(card)}
   end
 
+  @spec is_tie(card, card) :: boolean
+  def is_tie({r, _}, {r, _}), do: true
+  def is_tie({_, _}, {_, _}), do: false
+
   defp deal_card([], hands), do: hands
   defp deal_card([card|cards], [hand|hands]) do
     deal_card(cards, hands ++ [[card|hand]])
