@@ -34,9 +34,7 @@ defmodule Game do
   def new(deck \\ Deck.new) do
     game_name = :"game-#{:os.system_time(:millisecond)}"
     identifier = {game_name, Node.self()}
-    {:ok, _} = GenStateMachine.start_link(
-      __MODULE__, [deck, identifier], name: game_name
-    )
+    GenStateMachine.start_link(__MODULE__, [deck, identifier], name: game_name)
     identifier
   end
 
@@ -69,37 +67,20 @@ defmodule Game do
   def handle_event(event_type, event, current_state, current_data)
 
   def handle_event(:internal, :enter, :waiting_for_players, state) do
-    Logger.info "players needed: #{2 - length(state.players)}"
+    Logger.info "Players needed: #{2 - length(state.players)}"
     :keep_state_and_data
   end
 
   def handle_event(:cast, {:player_joined, player}, :waiting_for_players, state) do
-    case length(state.players) do
-      1 ->
-        Logger.info "#{Player.name(player)} has joined the game"
-        new_players = [player|state.players] |> Enum.reverse
-        player_states = new_players |> Enum.map(fn player ->
-          {player, %PlayerState{}}
-        end) |> Enum.into(Map.new)
-        new_state = %{state |
-          players: new_players, player_states: player_states
-        }
-        message_players(state, "#{Player.name(player)} has joined the game")
-        {:next_state, :ready, new_state, @enter_state}
-      0 ->
-        Logger.info "#{Player.name(player)} has joined the game"
-        {:keep_state, %{state | players: [player]}, @enter_state}
-      _ ->
-        {:stop, "Shouldn't have gotten here"}
+    case length(state.players) < 2 do
+      true -> add_player(player, state)
+      false -> {:stop, "Shouldn't have gotten here"}
     end
   end
 
   def handle_event(:internal, :enter, :ready, state) do
-    Logger.info "Ready to go with #{state.players |> player_names |> Enum.join(", ")}"
-    message_players(
-      state,
-      "Ready to go with #{state.players |> player_names |> Enum.join(", ")}"
-    )
+    msg = "Ready to start game with #{player_names(state.players)}"
+    log_and_message(state, msg)
     new_state = deal_cards(state)
     {:next_state, :turn, new_state, @enter_state}
   end
@@ -110,8 +91,8 @@ defmodule Game do
     Enum.each(state.player_states, fn {player, %{hand: hand}} ->
       Logger.info "  #{Player.name(player)} -> #{length(hand)}"
       message_player(player, "you've got #{length(hand)} cards in your hand")
+      message_player(player, "flip over one card")
     end)
-    message_players(state, "flip over one card")
     :keep_state_and_data
   end
 
@@ -121,7 +102,8 @@ defmodule Game do
   end
 
   def handle_event(_, {:player_joined, player}, _, _state) do
-    send player, "Sorry, #{Player.name(player)}! This game is full!"
+    Logger.info "#{Player.name(player)} tried to join game"
+    send player, "Sorry, this game is full!"
     :keep_state_and_data
   end
 
@@ -188,6 +170,7 @@ defmodule Game do
   defp player_names(players) do
     players
     |> Enum.map(&Player.name/1)
+    |> Enum.join(", ")
   end
 
   defp deal_cards(state) do
@@ -298,6 +281,11 @@ defmodule Game do
     {:next_state, :check_for_game_end, new_state, @enter_state}
   end
 
+  defp log_and_message(state, msg) do
+    Logger.info msg
+    message_players(state, msg)
+  end
+
   defp message_players(state, msg) do
     if Mix.env != :test do
       state.players
@@ -310,6 +298,23 @@ defmodule Game do
   defp message_player(player, msg) do
     if Mix.env != :test do
       send player, msg
+    end
+  end
+
+  defp add_player(player, state) do
+    new_players = [player|state.players] |> Enum.reverse
+    player_states = new_players |> Enum.map(fn player ->
+      {player, %PlayerState{}}
+    end) |> Enum.into(Map.new)
+    new_state = %{state |
+     players: new_players, player_states: player_states
+    }
+    log_and_message(state, "#{Player.name(player)} has joined the game")
+    case length(new_state.players) do
+      2 ->
+        {:next_state, :ready, new_state, @enter_state}
+      1 ->
+        {:keep_state, new_state, @enter_state}
     end
   end
 end
